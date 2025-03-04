@@ -1,0 +1,102 @@
+@author Andrey Tsirulev
+
+@copyright 2012 Artplant
+
+@version 0.2
+
+@title Cerberus - Generic authentication server
+
+@doc <h3>Overview</h3>
+Cerberus is a generic authentication server.
+
+Authentication is a process of verifying user's identity. Cerberus supports password authentication.
+Basic HTTP authentication and plain text authentication can be performed via cerberus.
+
+<h3>Realms</h3>
+Cerberus supports multiple realms. Realms allow to use different user directories for different resources.
+
+Cerberus itself knows nothing about authentification purpose. It is client's responsibility to define realms
+and use correct realm(s) for specific resource.
+
+Realms should not be used as groups of users. Groups of users can be used to authorize user access to different
+resources inside one realm. Currently cerberus doesn't provide authorization functionality.
+
+Realms can be specified in cerberus application config or added in runtime via {@link cerberus:add_realm/2}.
+
+<h3>Directories</h3>
+Directory is a user database. Directories contain at least user names and passwords.
+
+Cerberus supports different directories. Moreover it can be simply extended with new directory types
+by implementing {@link cerberus_directory} behaviour callbacks.
+
+The following directory types are provided by cerberus application:
+* LDAP ({@link cerberus_ldap})
+* Simple user/password list ({@link cerberus_users})
+
+See documentation to mentioned callback modules for details about specific directory.
+
+A directory should be configured for each realm.
+
+<h3>Application config</h3>
+Here is an application config example:
+<pre>
+[
+{cerberus, [
+    {realms, [
+        {yourcompany, [
+            {title, "Your Company LDAP"},
+            {directory,
+                {cerberus_ldap, [
+                    {host, "yourcompany.com"},
+                    {base, "ou=Users,dc=yourcompany,dc=com"},
+                    {timeout, 5000}
+                ]}}
+        ]},
+        {internal, [
+            {title, "Internal Directory"},
+            {directory,
+                {cerberus_users, [
+                    {"admin", "adminsecret"},
+                    {"user", "usersecret"}
+                ]}}
+        ]}
+    ]}
+]}
+].
+</pre>
+
+The only supported configuration option is <b>realms</b> which defines realms to be added on application start.
+
+Each realm is described as a <b>{Name, Options}</b> tuple, where <b>Name</b> is a realm name to be specified in
+authentication request ({@link cerberus:authenticate/3}) and Options is an option proplist for this realm.
+
+The following options are supported:
+
+<b>title</b> option is a realm title string that can be displayed to the user. It can be fetched using {@link cerberus:title/1} function.
+
+<b>directory</b> option is a directory used by this realm. Directory is described by a <b>{Handler, HandlerData}</b> tuple, where
+<b>Handler</b> is a {@link cerberus_directory} behaviour callback and <b>Data</b> is a callback-specific
+configuration data (see specific callback documentation on its configuration data).
+
+In the example above, there're 2 realms: 'yourcompany' and 'internal'. 'yourcompany' realm used LDAP directory, and
+'internal' realm used user/password list.
+
+<h4>Authentication examples</h4>
+
+<pre>
+> cerberus:authenticate(internal, "admin", "adminsecret").
+ok
+</pre>
+
+<pre>
+> cerberus:authenticate(yourcompany, "test", "idontknow").
+{reject,invalidCredentials}
+</pre>
+
+In this case the user "test" is found in ldap directory but authentication failed.
+
+<pre>
+> cerberus:authenticate(yourcompany, "idontexist", "42").
+{reject,unknown_user}
+</pre>
+In this case the user is not found at all.
